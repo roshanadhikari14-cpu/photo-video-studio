@@ -49,6 +49,18 @@ const ID = /^[A-Za-z0-9]{12}$/;
 const log = (...a) => console.log(new Date().toLocaleTimeString(), ...a);
 const link = (id) => (CFG.siteUrl ? CFG.siteUrl.replace(/\/$/, "") : "") + "/r/" + id;
 
+// Every link also goes into client-requests/LINKS.txt and pops up a Windows notification.
+function announce(title, text, id) {
+  const line = `${new Date().toLocaleString()}  ${title}  ${link(id)}  ${text}\r\n`;
+  try { fs.mkdirSync(CFG.requestsFolder, { recursive: true }); fs.appendFileSync(path.join(CFG.requestsFolder, "LINKS.txt"), line); } catch {}
+  if (process.platform !== "win32") return;
+  const esc = (v) => String(v).replace(/'/g, "''").slice(0, 200);
+  const ps = `Add-Type -AssemblyName System.Windows.Forms; $n=New-Object System.Windows.Forms.NotifyIcon; ` +
+    `$n.Icon=[System.Drawing.SystemIcons]::Information; $n.Visible=$true; ` +
+    `$n.ShowBalloonTip(10000,'${esc(title)}','${esc(text + " - " + link(id))}','Info'); Start-Sleep 11; $n.Dispose()`;
+  try { spawn("powershell", ["-NoProfile", "-WindowStyle", "Hidden", "-Command", ps], { stdio: "ignore", detached: true }).unref(); } catch {}
+}
+
 async function listAll(prefix) {
   const out = []; let cursor;
   do {
@@ -107,6 +119,8 @@ async function pull(e) {
   log(`NEW request ${e.id} from ${req.name || "(no name)"}: ${req.files.length} file(s) -> ${dir}`);
   log(`   "${req.prompt.slice(0, 140).replace(/\s+/g, " ")}${req.prompt.length > 140 ? "…" : ""}"`);
   log(`   To let Claude edit it:  node local/agent.mjs run ${e.id}`);
+  log(`   Link: ${link(e.id)}`);
+  announce(`New upload from ${req.name || "a friend"}`, `${req.files.length} file(s) saved to ${path.join(dir, "uploads")}`, e.id);
   return { dir, req, fresh: true };
 }
 
@@ -205,6 +219,7 @@ async function publish(id, dir, note) {
     title: String(man.title || "").slice(0, 80), subtitle: String(man.subtitle || "").slice(0, 200), items,
   }), { access: "public", addRandomSuffix: true, contentType: "application/json" });
   log(`DONE ${id}: ${files.length} file(s) published -> ${link(id)}`);
+  announce("Edit published", `${files.length} file(s) are live`, id);
   return true;
 }
 
