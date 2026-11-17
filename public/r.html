@@ -57,7 +57,7 @@
     <div class="section" style="margin-top:30px"><details><summary>What you asked for</summary><p class="prompt" id="gprompt" style="margin-top:10px"></p></details></div>
   </section>
 
-  <p class="hint" style="margin-top:26px"><a href="/">Send another request</a></p>
+  <p class="hint" style="margin-top:26px"><a href="/">Upload more photos & videos</a></p>
 </main>
 
 <div class="viewer" id="viewer" hidden role="dialog" aria-modal="true" aria-label="Your edits">
@@ -101,7 +101,7 @@ function animatePct() {
 function renderPending(d, st) {
   $("#card").hidden = false;
   $("#title").textContent = d.name ? `Hi ${d.name.split(" ")[0]}, here's your edit` : "Your edit";
-  $("#sub").textContent = "Sent " + new Date(d.createdAt).toLocaleString();
+  $("#sub").textContent = "Uploaded " + new Date(d.createdAt).toLocaleString();
   const p = Math.max(5, Math.min(99, Math.round(d.progress ?? (st === "working" ? 30 : 10))));
   if (p > target) { target = p; animatePct(); }
   $("#stagetext").textContent = d.note && st === "working" ? d.note : STAGE[st];
@@ -215,7 +215,7 @@ const url = location.origin + "/r/" + id;
 $("#link").value = url;
 $("#copy").onclick = () => copyText(url, $("#copy"));
 $("#copy2").onclick = () => copyText(url, $("#copy2"));
-if (new URLSearchParams(location.search).has("new")) { $("#savehint").textContent = "Sent! Save this link: it's where your finished files will appear."; history.replaceState(null, "", "/r/" + id); }
+if (new URLSearchParams(location.search).has("new")) { $("#savehint").textContent = "Uploaded! Save this link: it's where your finished files will appear."; history.replaceState(null, "", "/r/" + id); }
 load(); timer = setInterval(load, 15000);
 document.addEventListener("visibilitychange", () => { if (!document.hidden && timer) load(); });
 </script>
