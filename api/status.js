@@ -45,6 +45,8 @@ export default async function handler(req, res) {
     prompt: request.prompt,
     createdAt: request.createdAt,
     uploads: request.files.map((f) => ({ url: f.url, name: f.name, type: f.type })),
+    previews: blobs.filter((b) => b.pathname.startsWith(`requests/${id}/preview/`))
+      .sort((a, b) => a.pathname.localeCompare(b.pathname)).map((b) => b.url),
     status: status.status,
     note: status.note || "",
     progress: typeof status.progress === "number" ? status.progress : null,

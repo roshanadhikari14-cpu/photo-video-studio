@@ -17,3 +17,7 @@ They are REFERENCE CODE: copy the helpers you need into your own script inside t
 
 Fonts: `C:\Users\MY PC\.claude\skills\effects\fonts` (Anton, Playfair Display + Italic, Montserrat, Permanent Marker, Space Mono).
 Python: `python` (has PIL + numpy). Video: `ffmpeg` / `ffprobe`.
+
+## iPhone HEIC photos
+
+`pillow-heif` is installed: `import pillow_heif; pillow_heif.register_heif_opener()` and then `PIL.Image.open("x.heic")` works (apply `ImageOps.exif_transpose`).

@@ -102,6 +102,24 @@ async function download(url, dest) {
   await pipeline(Readable.fromWeb(r.body), fs.createWriteStream(dest));
 }
 
+// Small JPEG previews of the uploads (HEIC photos and videos too) for the loading animation.
+async function makePreviews(id, dir) {
+  const out = path.join(dir, ".previews");
+  const py = CFG.pythonDir ? path.join(CFG.pythonDir, "python.exe") : "python";
+  const script = path.join(path.dirname(fileURLToPath(import.meta.url)), "preview.py");
+  await new Promise((res) => {
+    const c = spawn(fs.existsSync(py) ? py : "python", [script, path.join(dir, "uploads"), out], { stdio: "ignore" });
+    c.on("close", res); c.on("error", res);
+  });
+  if (!fs.existsSync(out)) return;
+  for (const f of fs.readdirSync(out).filter((n) => n.endsWith(".jpg")).sort()) {
+    try {
+      await put(`requests/${id}/preview/${f.replace(/[^A-Za-z0-9._-]/g, "_")}`, fs.readFileSync(path.join(out, f)),
+        { access: "public", addRandomSuffix: true, contentType: "image/jpeg" });
+    } catch (err) { log("preview upload failed:", err.message); }
+  }
+}
+
 // ---------- 1. pull a new request down to this PC ----------
 async function pull(e) {
   const req = await json(e.request.url);
@@ -116,6 +134,7 @@ async function pull(e) {
   fs.writeFileSync(path.join(dir, "request.json"), JSON.stringify(req, null, 2));
   fs.writeFileSync(path.join(dir, "PROMPT.txt"), `From: ${req.name || "(no name)"}\nSent: ${req.createdAt}\nLink: ${link(e.id)}\n\n${req.prompt}\n`);
   if (!e.statuses.length) await setStatus(e.id, "received");
+  await makePreviews(e.id, dir);
   log(`NEW request ${e.id} from ${req.name || "(no name)"}: ${req.files.length} file(s) -> ${dir}`);
   log(`   "${req.prompt.slice(0, 140).replace(/\s+/g, " ")}${req.prompt.length > 140 ? "…" : ""}"`);
   log(`   To let Claude edit it:  node local/agent.mjs run ${e.id}`);
@@ -260,6 +279,10 @@ if (cmd === "list") {
   }
 } else if (cmd === "run" && ID.test(arg || "")) {
   await process1(arg);
+} else if (cmd === "previews" && ID.test(arg || "")) {
+  const e = (await remoteRequests()).find((x) => x.id === arg);
+  if (!e) throw new Error("No request with id " + arg);
+  await makePreviews(arg, folderFor(arg, await json(e.request.url)));
 } else if (cmd === "publish" && ID.test(arg || "")) {
   const e = (await remoteRequests()).find((x) => x.id === arg);
   if (!e) throw new Error("No request with id " + arg);

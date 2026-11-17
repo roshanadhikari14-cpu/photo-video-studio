@@ -20,6 +20,11 @@
     <h1 id="title">Your edit</h1>
     <p class="sub" id="sub">Loading…</p>
     <div class="card" id="card" hidden>
+      <div class="orbit" id="orbit" aria-hidden="true">
+        <div class="glow"></div>
+        <div class="rings"><i></i><i></i><i></i></div>
+        <div class="core"><b class="grad" id="opct">0%</b><small id="ostage">Received</small></div>
+      </div>
       <div class="meter" style="margin-top:0">
         <div class="head"><span id="stagetext">Received</span><span class="big grad" id="pct">0%</span></div>
         <div class="track live" id="track"><i id="fill"></i></div>
@@ -94,8 +99,52 @@ async function copyText(t, btn) {
 }
 function animatePct() {
   if (shownPct < target) shownPct = Math.min(target, shownPct + Math.max(1, Math.round((target - shownPct) / 8)));
-  $("#pct").textContent = shownPct + "%"; $("#fill").style.width = shownPct + "%";
+  $("#pct").textContent = shownPct + "%"; $("#fill").style.width = shownPct + "%"; $("#opct").textContent = shownPct + "%";
   if (shownPct < target) setTimeout(animatePct, 30);
+}
+
+// ---------- loading animation: the uploaded photos fly around the % ----------
+let orbitKey = "", orbitRaf = 0;
+const calm = matchMedia("(prefers-reduced-motion: reduce)").matches;
+function buildOrbit(d) {
+  const srcs = (d.previews && d.previews.length ? d.previews
+    : d.uploads.filter((u) => /^image\/(jpe?g|png|webp|gif)/.test(u.type || "")).map((u) => u.url)).slice(0, 12);
+  const key = srcs.join("|") + "#" + d.uploads.length;
+  if (key === orbitKey) return;
+  orbitKey = key;
+  const box = $("#orbit");
+  box.querySelectorAll(".fly,.spark").forEach((n) => n.remove());
+  const n = Math.max(srcs.length, Math.min(d.uploads.length, 8), 5);
+  const cards = [];
+  for (let i = 0; i < n; i++) {
+    const c = el("div", "fly");
+    if (srcs.length) { const im = el("img"); im.src = srcs[i % srcs.length]; im.alt = ""; im.onerror = () => im.remove(); c.append(im); }
+    box.append(c);
+    cards.push({ c, a: (i / n) * Math.PI * 2, lane: i % 2, tilt: (Math.random() - 0.5) * 24, bob: Math.random() * 6 });
+  }
+  for (let i = 0; i < 14; i++) {
+    const s = el("i", "spark");
+    s.style.left = Math.random() * 100 + "%"; s.style.top = Math.random() * 100 + "%";
+    s.style.animationDelay = (Math.random() * 3).toFixed(2) + "s"; s.style.animationDuration = (2 + Math.random() * 2.5).toFixed(2) + "s";
+    box.append(s);
+  }
+  cancelAnimationFrame(orbitRaf);
+  let t0 = performance.now();
+  const step = (now) => {
+    const t = (now - t0) / 1000, W = box.clientWidth, H = box.clientHeight, fast = box.classList.contains("fast") ? 1.8 : 1;
+    for (const k of cards) {
+      const sp = (k.lane ? -0.22 : 0.32) * fast, ang = k.a + (calm ? 0 : t * sp);
+      const rx = W * (k.lane ? 0.40 : 0.31), ry = H * (k.lane ? 0.40 : 0.28);
+      const x = W / 2 + Math.cos(ang) * rx, y = H / 2 + Math.sin(ang) * ry + (calm ? 0 : Math.sin(t * 2 + k.bob) * 6);
+      const depth = (Math.sin(ang) + 1) / 2;                       // front of the ellipse = bigger, on top
+      const sc = 0.72 + depth * 0.45;
+      k.c.style.transform = `translate(${x}px,${y}px) translate(-50%,-50%) rotate(${k.tilt + (calm ? 0 : Math.sin(t + k.bob) * 8)}deg) scale(${sc})`;
+      k.c.style.zIndex = depth > 0.5 ? 3 : 1;
+      k.c.style.opacity = (0.55 + depth * 0.45).toFixed(2);
+    }
+    if (!calm && !$("#pending").hidden) orbitRaf = requestAnimationFrame(step);
+  };
+  orbitRaf = requestAnimationFrame(step);
 }
 
 function renderPending(d, st) {
@@ -107,11 +156,17 @@ function renderPending(d, st) {
   $("#stagetext").textContent = d.note && st === "working" ? d.note : STAGE[st];
   ["#st1", "#st2", "#st3"].forEach((s, i) => $(s).classList.toggle("on", i === { received: 0, working: 1 }[st]));
   $("#prompt").textContent = d.prompt;
-  if (!$("#uploads").childElementCount) {
+  $("#ostage").textContent = { received: "Received", working: "Editing" }[st] || "";
+  $("#orbit").classList.toggle("fast", st === "working");
+  buildOrbit(d);
+  const pv = d.previews || [];
+  if ($("#uploads").dataset.n !== String(pv.length)) {
+    $("#uploads").dataset.n = String(pv.length); $("#uploads").replaceChildren();
     $("#uploadsum").textContent = `Your files (${d.uploads.length})`;
-    for (const u of d.uploads) {
+    for (const [i, u] of d.uploads.entries()) {
       const t = el("div", "thumb");
-      const m = media({ url: u.url, name: (u.type || "").startsWith("video/") ? u.name + ".mp4" : u.name }, true);
+      const m = pv.length === d.uploads.length ? media({ url: pv[i], name: "p.jpg" }, true)
+        : media({ url: u.url, name: (u.type || "").startsWith("video/") ? u.name + ".mp4" : u.name }, true);
       if (m.tagName === "IMG") m.onerror = () => t.replaceChildren(el("span", "badge", u.name));
       t.append(m); $("#uploads").append(t);
     }
