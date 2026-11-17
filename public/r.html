@@ -1,0 +1,223 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Your edit</title>
+<meta name="robots" content="noindex">
+<meta name="theme-color" content="#d62976">
+<link rel="stylesheet" href="/style.css">
+</head>
+<body>
+<main id="main">
+  <div class="top">
+    <div class="logo"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 2.5l2.1 5.9 5.9 2.1-5.9 2.1L12 18.5l-2.1-5.9L4 10.5l5.9-2.1z"/><path d="M18.5 15l.9 2.4 2.4.9-2.4.9-.9 2.4-.9-2.4-2.4-.9 2.4-.9z"/></svg></div>
+    <span class="brand">Edit Studio</span>
+  </div>
+
+  <!-- while the edit is being made -->
+  <section id="pending">
+    <h1 id="title">Your edit</h1>
+    <p class="sub" id="sub">Loading…</p>
+    <div class="card" id="card" hidden>
+      <div class="meter" style="margin-top:0">
+        <div class="head"><span id="stagetext">Received</span><span class="big grad" id="pct">0%</span></div>
+        <div class="track live" id="track"><i id="fill"></i></div>
+        <div class="stage"><span id="st1">Received</span><span id="st2">Editing</span><span id="st3">Ready</span></div>
+      </div>
+      <p class="hint" id="wait">Your posts, stories, collages and videos will appear here when it reaches 100%. This page updates by itself, so you can leave it open or come back later.</p>
+      <div class="copy">
+        <input type="text" id="link" readonly aria-label="Link to this page">
+        <button class="btn ghost" id="copy" type="button">Copy link</button>
+      </div>
+      <p class="hint" id="savehint">Save this link to come back for your finished files.</p>
+      <div class="section"><h2>What you asked for</h2><p class="prompt" id="prompt"></p></div>
+      <div class="section"><details><summary id="uploadsum">Your files</summary><div class="thumbs" id="uploads"></div></details></div>
+    </div>
+  </section>
+
+  <!-- when it's ready: a gallery like an edit package -->
+  <section id="gallery" hidden>
+    <div class="hero">
+      <div>
+        <div class="donebar"><span class="donepill">✓ Ready · 100%</span></div>
+        <h1 id="gtitle" style="margin-top:12px"></h1>
+        <p class="sub" id="gsub" style="margin-bottom:10px"></p>
+        <p class="note" id="gnote" hidden></p>
+        <ul class="counts" id="counts"></ul>
+        <div style="display:flex;gap:8px;margin-top:16px;flex-wrap:wrap">
+          <button class="btn" id="open" type="button" style="width:auto">Open your edits</button>
+          <button class="btn ghost" id="copy2" type="button" style="width:auto">Copy link</button>
+        </div>
+      </div>
+      <div class="cover" id="cover" hidden><img id="coverimg" alt=""></div>
+    </div>
+    <nav class="chips" id="chips" aria-label="Sections"></nav>
+    <div id="sections"></div>
+    <div class="section" style="margin-top:30px"><details><summary>What you asked for</summary><p class="prompt" id="gprompt" style="margin-top:10px"></p></details></div>
+  </section>
+
+  <p class="hint" style="margin-top:26px"><a href="/">Send another request</a></p>
+</main>
+
+<div class="viewer" id="viewer" hidden role="dialog" aria-modal="true" aria-label="Your edits">
+  <div class="vtop"><button type="button" id="vclose">Close</button><span id="vcount"></span><a id="vdl" href="#">Download</a></div>
+  <div class="vbody" id="vbody"></div>
+  <div class="vcap" id="vcap"></div>
+  <div class="vnav"><button type="button" id="vprev">Previous</button><div class="dots" id="dots"></div><button type="button" id="vnext">Next</button></div>
+</div>
+
+<script>
+const $ = (s) => document.querySelector(s);
+const id = (location.pathname.split("/").pop() || "").replace(/[^A-Za-z0-9]/g, "");
+const STAGE = { received: "Received, we've got your files", working: "Creating your edits…", done: "Your edit is ready" };
+const SECTIONS = [
+  ["posts", "Posts", "Ready-to-post 4:5 Instagram posts with text. Copy the caption and post."],
+  ["stories", "Stories", "9:16 story versions, text kept clear of Instagram's buttons."],
+  ["collages", "Collages", "Several photos in one post."],
+  ["videos", "Videos", "Vertical 9:16 reels and story videos. Tap to play."],
+  ["photos", "Edited photos", "Your photos, colour-graded. No text."],
+];
+const isVideo = (n) => /\.(mp4|mov|m4v|webm)$/i.test(n);
+const PLAY = '<svg class="play" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M8 5v14l11-7z"/></svg>';
+let timer, shownKey = "", results = [], target = 0, shownPct = 0, idx = 0, built = false;
+
+function el(tag, cls, text) { const e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; }
+function media(r, poster) {
+  let m;
+  if (isVideo(r.name)) { m = el("video"); m.src = r.url + (poster ? "#t=0.5" : ""); m.preload = "metadata"; m.muted = !!poster; m.playsInline = true; }
+  else { m = el("img"); m.src = r.url; m.alt = r.title || r.name; m.loading = "lazy"; }
+  return m;
+}
+async function copyText(t, btn) {
+  try { await navigator.clipboard.writeText(t); const o = btn.textContent; btn.textContent = "Copied"; setTimeout(() => (btn.textContent = o), 1500); } catch {}
+}
+function animatePct() {
+  if (shownPct < target) shownPct = Math.min(target, shownPct + Math.max(1, Math.round((target - shownPct) / 8)));
+  $("#pct").textContent = shownPct + "%"; $("#fill").style.width = shownPct + "%";
+  if (shownPct < target) setTimeout(animatePct, 30);
+}
+
+function renderPending(d, st) {
+  $("#card").hidden = false;
+  $("#title").textContent = d.name ? `Hi ${d.name.split(" ")[0]}, here's your edit` : "Your edit";
+  $("#sub").textContent = "Sent " + new Date(d.createdAt).toLocaleString();
+  const p = Math.max(5, Math.min(99, Math.round(d.progress ?? (st === "working" ? 30 : 10))));
+  if (p > target) { target = p; animatePct(); }
+  $("#stagetext").textContent = d.note && st === "working" ? d.note : STAGE[st];
+  ["#st1", "#st2", "#st3"].forEach((s, i) => $(s).classList.toggle("on", i === { received: 0, working: 1 }[st]));
+  $("#prompt").textContent = d.prompt;
+  if (!$("#uploads").childElementCount) {
+    $("#uploadsum").textContent = `Your files (${d.uploads.length})`;
+    for (const u of d.uploads) {
+      const t = el("div", "thumb");
+      const m = media({ url: u.url, name: (u.type || "").startsWith("video/") ? u.name + ".mp4" : u.name }, true);
+      if (m.tagName === "IMG") m.onerror = () => t.replaceChildren(el("span", "badge", u.name));
+      t.append(m); $("#uploads").append(t);
+    }
+  }
+}
+
+function renderGallery(d) {
+  $("#pending").hidden = true; $("#gallery").hidden = false; $("#main").classList.add("wide");
+  results = d.results;
+  const title = d.title || (d.name ? `${d.name.split(" ")[0]}'s edit` : "Your edit");
+  $("#gtitle").textContent = title; document.title = title + " · Edit Studio";
+  $("#gsub").textContent = d.subtitle || "Your photos and videos, edited and ready for Instagram.";
+  $("#gnote").hidden = !d.note; $("#gnote").textContent = d.note || "";
+  $("#gprompt").textContent = d.prompt;
+  const cover = results.find((r) => r.group === "posts" && !isVideo(r.name)) || results.find((r) => !isVideo(r.name));
+  if (cover) { $("#cover").hidden = false; $("#coverimg").src = cover.url; }
+  $("#open").textContent = `Open your edits (${results.length})`;
+
+  const counts = $("#counts"), chips = $("#chips"), secs = $("#sections");
+  counts.replaceChildren(); chips.replaceChildren(); secs.replaceChildren();
+  for (const [g, label, lead] of SECTIONS) {
+    const items = results.filter((r) => r.group === g);
+    if (!items.length) continue;
+    const li = el("li"); li.append(el("b", null, items.length), document.createTextNode(" " + label.toLowerCase())); counts.append(li);
+    const a = el("a", null, label); a.href = "#sec-" + g; chips.append(a);
+    const sec = el("section", "gsec"); sec.id = "sec-" + g;
+    sec.append(el("h2", null, label), el("p", "lead", lead));
+    if (g === "photos") {
+      const grid = el("div", "igrid");
+      for (const r of items) { const b = el("button"); b.type = "button"; b.setAttribute("aria-label", "Open " + (r.title || r.name)); b.append(media(r, true)); b.onclick = () => openViewer(results.indexOf(r)); grid.append(b); }
+      sec.append(grid);
+    } else {
+      const grid = el("div", "ggrid" + (g === "stories" || g === "videos" ? " tall" : ""));
+      for (const r of items) {
+        const card = el("article", "gcard");
+        const b = el("button", "media"); b.type = "button"; b.setAttribute("aria-label", "Open " + (r.title || r.name));
+        b.append(media(r, true)); if (isVideo(r.name)) b.insertAdjacentHTML("beforeend", PLAY);
+        b.onclick = () => openViewer(results.indexOf(r));
+        const body = el("div", "body");
+        body.append(el("h3", null, r.title || r.name.replace(/\.[^.]+$/, "").replace(/[_-]+/g, " ")));
+        if (r.caption) body.append(el("p", "cap", r.caption));
+        const acts = el("div", "acts");
+        const dl = el("a", null, "Download"); dl.href = r.downloadUrl; acts.append(dl);
+        if (r.caption) { const cp = el("button", null, "Copy caption"); cp.type = "button"; cp.onclick = () => copyText(r.caption, cp); acts.append(cp); }
+        body.append(acts); card.append(b, body); grid.append(card);
+      }
+      sec.append(grid);
+    }
+    secs.append(sec);
+  }
+}
+
+function render(d) {
+  const st = d.status in STAGE ? d.status : "received";
+  const key = JSON.stringify([st, d.progress, d.note, d.results.map((r) => r.url)]);
+  if (key === shownKey) return; shownKey = key;
+  if (st === "done" && d.results.length) { renderGallery(d); clearInterval(timer); timer = null; }
+  else renderPending(d, st);
+}
+
+// ---------- viewer ----------
+function show(i) {
+  idx = (i + results.length) % results.length;
+  const r = results[idx], body = $("#vbody"); body.replaceChildren();
+  const m = media(r, false); if (m.tagName === "VIDEO") { m.controls = true; m.autoplay = true; }
+  body.append(m);
+  $("#vcount").textContent = `${idx + 1} / ${results.length}`;
+  $("#vdl").href = r.downloadUrl;
+  const cap = $("#vcap"); cap.replaceChildren();
+  if (r.title) cap.append(el("b", null, r.title));
+  if (r.caption) { cap.append(document.createTextNode(r.caption)); const cp = el("button", null, "Copy caption"); cp.type = "button"; cp.onclick = () => copyText(r.caption, cp); cap.append(el("br"), cp); }
+  const dots = results.length <= 30 ? results.map((_, j) => { const d = el("i"); if (j === idx) d.className = "on"; return d; }) : [];
+  $("#dots").replaceChildren(...dots);
+  const many = results.length > 1; $("#vprev").hidden = !many; $("#vnext").hidden = !many;
+}
+function openViewer(i = 0) { $("#viewer").hidden = false; document.body.style.overflow = "hidden"; show(i); $("#vclose").focus(); }
+function closeViewer() { $("#viewer").hidden = true; document.body.style.overflow = ""; $("#vbody").replaceChildren(); }
+$("#open").onclick = () => openViewer(0);
+$("#vclose").onclick = closeViewer;
+$("#vprev").onclick = () => show(idx - 1);
+$("#vnext").onclick = () => show(idx + 1);
+document.addEventListener("keydown", (e) => {
+  if ($("#viewer").hidden) return;
+  if (e.key === "Escape") closeViewer(); if (e.key === "ArrowRight") show(idx + 1); if (e.key === "ArrowLeft") show(idx - 1);
+});
+let sx = null;
+$("#vbody").addEventListener("touchstart", (e) => (sx = e.touches[0].clientX), { passive: true });
+$("#vbody").addEventListener("touchend", (e) => { if (sx == null) return; const dx = e.changedTouches[0].clientX - sx; if (Math.abs(dx) > 50) show(idx + (dx < 0 ? 1 : -1)); sx = null; });
+
+// ---------- polling ----------
+async function load() {
+  if (document.hidden) return;
+  try {
+    const r = await fetch("/api/status?id=" + encodeURIComponent(id));
+    if (r.status === 404) { $("#sub").textContent = "We couldn't find this request. Check the link and try again."; clearInterval(timer); return; }
+    if (!r.ok) throw 0;
+    render(await r.json());
+  } catch { if (!shownKey) $("#sub").textContent = "Couldn't load right now. This page will try again in a moment."; }
+}
+const url = location.origin + "/r/" + id;
+$("#link").value = url;
+$("#copy").onclick = () => copyText(url, $("#copy"));
+$("#copy2").onclick = () => copyText(url, $("#copy2"));
+if (new URLSearchParams(location.search).has("new")) { $("#savehint").textContent = "Sent! Save this link: it's where your finished files will appear."; history.replaceState(null, "", "/r/" + id); }
+load(); timer = setInterval(load, 15000);
+document.addEventListener("visibilitychange", () => { if (!document.hidden && timer) load(); });
+</script>
+</body>
+</html>

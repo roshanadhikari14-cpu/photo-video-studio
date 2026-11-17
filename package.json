@@ -1,0 +1,20 @@
+{
+  "name": "upload-portal",
+  "version": "1.0.0",
+  "description": "Photo/video upload portal",
+  "scripts": {
+    "build": "esbuild src/blob-client.js --bundle --format=esm --platform=browser --minify --outfile=public/blob-client.js",
+    "agent": "node local/agent.mjs"
+  },
+  "type": "module",
+  "dependencies": {
+    "@vercel/blob": "2.8.2"
+  },
+  "devDependencies": {
+    "esbuild": "0.28.2"
+  },
+  "private": true,
+  "engines": {
+    "node": ">=20"
+  }
+}
