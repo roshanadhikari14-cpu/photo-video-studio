@@ -81,8 +81,9 @@ a{color:var(--blue)}
 .vtop{display:flex;align-items:center;justify-content:space-between;padding:12px 14px;color:#fff}
 .vtop button,.vnav button{background:rgba(255,255,255,.15);color:#fff;border:0;border-radius:99px;padding:8px 14px;font:inherit;font-weight:600;cursor:pointer}
 .vtop a{color:#fff;font-weight:600;text-decoration:none;background:var(--ig);border-radius:99px;padding:8px 14px}
-.vbody{flex:1;display:grid;place-items:center;min-height:0;padding:0 8px;touch-action:pan-y}
-.vbody img,.vbody video{max-width:100%;max-height:100%;object-fit:contain;display:block}
+.vbody{flex:1;position:relative;min-height:0;margin:0 8px;touch-action:pan-y;overflow:hidden}
+.vbody img,.vbody video{position:absolute;inset:0;width:100%;height:100%;object-fit:contain;display:block}
+.vtop,.vnav,.vcap{flex:none}
 .vnav{display:flex;justify-content:space-between;align-items:center;padding:12px 14px 20px;color:#fff;font-size:14px}
 .dots{display:flex;gap:5px;justify-content:center}
 .dots i{width:6px;height:6px;border-radius:50%;background:rgba(255,255,255,.35)}
