@@ -37,7 +37,7 @@
       <input type="text" id="name" maxlength="80" autocomplete="name">
     </div>
 
-    <button class="btn" id="send" type="submit">Send</button>
+    <button class="btn" id="send" type="submit">Upload</button>
     <div class="meter" id="meter" hidden>
       <div class="head"><span id="mlabel">Uploading…</span><b id="mpct">0%</b></div>
       <div class="track live"><i id="mfill"></i></div>
@@ -109,7 +109,7 @@ $("#form").addEventListener("submit", async (e) => {
   if (!prompt) { $("#prompt").focus(); return say("Tell us what you'd like done with your files.", true); }
 
   const send = $("#send"), fill = $("#mfill"), pctEl = $("#mpct");
-  send.disabled = true; send.textContent = "Sending…"; $("#meter").hidden = false; say("Keep this page open until it reaches 100%.");
+  send.disabled = true; send.textContent = "Uploading…"; $("#meter").hidden = false; say("Keep this page open until it reaches 100%.");
   document.querySelectorAll(".thumb .x").forEach((b) => (b.hidden = true));
   const id = newId(), total = files.reduce((s, f) => s + f.file.size, 0), done = new Map(), out = [];
   const tick = () => {
@@ -141,7 +141,7 @@ $("#form").addEventListener("submit", async (e) => {
       body: JSON.stringify({ id, prompt, name: $("#name").value.trim(), files: out }) });
     const j = await r.json().catch(() => ({}));
     if (!r.ok) throw new Error(j.error || "Couldn't send your request");
-    fill.style.width = "100%"; pctEl.textContent = "100%"; $("#mlabel").textContent = "Sent!";
+    fill.style.width = "100%"; pctEl.textContent = "100%"; $("#mlabel").textContent = "Uploaded!";
     try { const k = "myRequests", l = JSON.parse(localStorage.getItem(k) || "[]"); l.unshift(id); localStorage.setItem(k, JSON.stringify(l.slice(0, 20))); } catch {}
     setTimeout(() => (location.href = `/r/${id}?new=1`), 500);
   } catch (err) {
